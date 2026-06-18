@@ -19,15 +19,17 @@ Usage
     python examples/enterprise_integration.py llm-prompt
 """
 
-from __future__ import annotations
 
 import argparse
 import asyncio
 import json
 import sys
 import time
-
 import numpy as np
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("ai-ear.enterprise")
 
 
 # ---------------------------------------------------------------------------
@@ -69,36 +71,32 @@ async def demo_custom_analyser() -> None:
                 confidence=0.95 if detected else 0.0,
             )
 
-    print("\n🔌  Enterprise Integration Demo: Custom Analyser (BYOM)\n")
-
-    keyword_spotter = KeywordSpotter(keywords=["hey ai", "alert", "emergency"])
-    memory = AuralMemory()
-    pipeline = AudioPipeline(analyzers=[keyword_spotter], memory=memory)
-
-    keywords_detected: list[str] = []
-
-    async def on_result(result):
-        if result.speech and result.speech.text:
-            keywords_detected.append(result.speech.text)
-            print(f"  🔑 Keyword detected: '{result.speech.text}'")
-
-    pipeline.on_result(on_result)
-    await pipeline.start()
-
-    SR = 16_000
-    for i in range(6):
-        chunk = AudioChunk(
-            samples=np.zeros(SR * 2, dtype=np.float32),
-            sample_rate=SR,
-            source_id="enterprise_mic",
-        )
-        await pipeline.process(chunk)
-        await asyncio.sleep(0.01)
-
-    await pipeline.stop()
-
-    print(f"\n  Total keywords detected: {len(keywords_detected)}")
-    print(f"  Keywords: {keywords_detected}\n")
+    try:
+        logger.info("🔌  Enterprise Integration Demo: Custom Analyser (BYOM)")
+        keyword_spotter = KeywordSpotter(keywords=["hey ai", "alert", "emergency"])
+        memory = AuralMemory()
+        pipeline = AudioPipeline(analyzers=[keyword_spotter], memory=memory)
+        keywords_detected: list[str] = []
+        async def on_result(result):
+            if result.speech and result.speech.text:
+                keywords_detected.append(result.speech.text)
+                logger.info(f"  🔑 Keyword detected: '{result.speech.text}'")
+        pipeline.on_result(on_result)
+        await pipeline.start()
+        SR = 16_000
+        for i in range(6):
+            chunk = AudioChunk(
+                samples=np.zeros(SR * 2, dtype=np.float32),
+                sample_rate=SR,
+                source_id="enterprise_mic",
+            )
+            await pipeline.process(chunk)
+            await asyncio.sleep(0.01)
+        await pipeline.stop()
+        logger.info(f"  Total keywords detected: {len(keywords_detected)}")
+        logger.info(f"  Keywords: {keywords_detected}")
+    except Exception as e:
+        logger.error(f"Custom analyser demo failed: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -115,7 +113,8 @@ async def demo_alerting() -> None:
     from ai_ear.core.pipeline import AudioPipeline
     from ai_ear.utils.audio import generate_tone
 
-    print("\n🚨  Enterprise Integration Demo: Real-Time Alerting\n")
+    try:
+        logger.info("🚨  Enterprise Integration Demo: Real-Time Alerting")
 
     class AlertSystem:
         """Simulates routing events to PagerDuty / Slack / SIEM etc."""
@@ -133,9 +132,9 @@ async def demo_alerting() -> None:
                     "routing": "P1_PAGERDUTY" if event.severity >= 0.8 else "SLACK_CHANNEL",
                 }
                 self.alerts.append(alert)
-                print(f"  🚨 [{alert['routing']}] {alert['description']} (severity={event.severity:.1f})")
+                logger.warning(f"  🚨 [{alert['routing']}] {alert['description']} (severity={event.severity:.1f})")
             else:
-                print(f"  ℹ️  [{event.event_type.value}] {event.description}")
+                logger.info(f"  ℹ️  [{event.event_type.value}] {event.description}")
 
     alerts = AlertSystem()
     memory = AuralMemory()
@@ -159,8 +158,10 @@ async def demo_alerting() -> None:
         await pipeline._process_and_dispatch(chunk)
         await asyncio.sleep(0.05)
 
-    await pipeline.stop()
-    print(f"\n  Total high-severity alerts routed: {len(alerts.alerts)}\n")
+        await pipeline.stop()
+        logger.info(f"  Total high-severity alerts routed: {len(alerts.alerts)}")
+    except Exception as e:
+        logger.error(f"Alerting demo failed: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -176,7 +177,8 @@ async def demo_llm_prompt() -> None:
     from ai_ear.core.models import AudioChunk, EmotionLabel, EmotionProfile, SpeechSegment
     from ai_ear.core.pipeline import AudioPipeline
 
-    print("\n🤖  Enterprise Integration Demo: LLM Context Injection\n")
+    try:
+        logger.info("🤖  Enterprise Integration Demo: LLM Context Injection")
 
     memory = AuralMemory(context_window_s=120)
     pipeline = AudioPipeline(
@@ -206,12 +208,13 @@ async def demo_llm_prompt() -> None:
     summary = memory.context_summary()
     system_prompt = _build_system_prompt(summary)
 
-    print("  Generated LLM System Prompt:")
-    print("  " + "─" * 60)
-    for line in system_prompt.split("\n"):
-        print(f"  {line}")
-    print("  " + "─" * 60)
-    print()
+        logger.info("  Generated LLM System Prompt:")
+        logger.info("  " + "─" * 60)
+        for line in system_prompt.split("\n"):
+            logger.info(f"  {line}")
+        logger.info("  " + "─" * 60)
+    except Exception as e:
+        logger.error(f"LLM prompt demo failed: {e}")
 
 
 def _build_system_prompt(summary: dict) -> str:
@@ -259,17 +262,16 @@ def demo_serve() -> None:
     from ai_ear.api.server import create_app
     from ai_ear.core.config import Settings
 
-    print("\n🌐  Starting AI Ear API Server on http://0.0.0.0:8080\n")
-    print("  Endpoints:")
-    print("    GET  /health          — liveness probe")
-    print("    GET  /info            — configuration summary")
-    print("    POST /analyse         — analyse an uploaded audio file")
-    print("    GET  /memory/context  — aural context summary")
-    print("    GET  /memory/transcript — recent speech transcript")
-    print("    GET  /memory/events   — recent aural events")
-    print("    WS   /stream          — real-time WebSocket audio stream")
-    print("    GET  /pipeline/stats  — pipeline throughput stats")
-    print()
+    logger.info("🌐  Starting AI Ear API Server on http://0.0.0.0:8080")
+    logger.info("  Endpoints:")
+    logger.info("    GET  /health          — liveness probe")
+    logger.info("    GET  /info            — configuration summary")
+    logger.info("    POST /analyse         — analyse an uploaded audio file")
+    logger.info("    GET  /memory/context  — aural context summary")
+    logger.info("    GET  /memory/transcript — recent speech transcript")
+    logger.info("    GET  /memory/events   — recent aural events")
+    logger.info("    WS   /stream          — real-time WebSocket audio stream")
+    logger.info("    GET  /pipeline/stats  — pipeline throughput stats")
 
     settings = Settings()
     app = create_app(settings)
@@ -283,7 +285,8 @@ def demo_serve() -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description="AI Ear enterprise integration examples")
     sub = parser.add_subparsers(dest="command")
-    sub.add_parser("custom-analyser", help="BYOM custom analyser demo")
+    custom = sub.add_parser("custom-analyser", help="BYOM custom analyser demo")
+    custom.add_argument("--keywords", nargs="+", default=["hey ai", "alert", "emergency"], help="Keywords for spotter")
     sub.add_parser("alerting", help="Real-time alerting demo")
     sub.add_parser("llm-prompt", help="LLM context injection demo")
     sub.add_parser("serve", help="Start the API server")
