@@ -43,7 +43,7 @@ jobs:
       - name: Install minimal API test dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install numpy fastapi uvicorn websockets python-multipart pydantic pydantic-settings httpx pytest soundfile
+          python -m pip install numpy fastapi uvicorn websockets python-multipart pydantic pydantic-settings httpx pytest pytest-asyncio soundfile
       - name: Compile package
         run: python -m compileall -q ai_ear
       - name: Run API regression suite
