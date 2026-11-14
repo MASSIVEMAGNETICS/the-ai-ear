@@ -29,6 +29,18 @@ class Settings(BaseSettings):
     api_cors_origins: list[str] = Field(
         default=["*"], description="Allowed CORS origins"
     )
+    api_max_upload_bytes: int = Field(
+        default=25 * 1024 * 1024,
+        ge=1,
+        le=100 * 1024 * 1024,
+        description="Maximum accepted audio upload size in bytes",
+    )
+    api_max_ws_frame_bytes: int = Field(
+        default=1024 * 1024,
+        ge=4,
+        le=16 * 1024 * 1024,
+        description="Maximum binary PCM WebSocket frame size in bytes",
+    )
 
     # ---------------------------------------------------------------- Audio
     audio_sample_rate: int = Field(

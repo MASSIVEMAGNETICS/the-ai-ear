@@ -211,6 +211,8 @@ All settings are configurable via environment variables (prefix `AIEAR_`) or a `
 | `AIEAR_AUDIO_CHUNK_DURATION_S` | `2.0` | Analysis window size (seconds) |
 | `AIEAR_MEMORY_CONTEXT_WINDOW_S` | `60.0` | Rolling context window (seconds) |
 | `AIEAR_API_PORT` | `8080` | API server port |
+| `AIEAR_API_MAX_UPLOAD_BYTES` | `26214400` (25 MiB) | Maximum accepted `/analyse` upload |
+| `AIEAR_API_MAX_WS_FRAME_BYTES` | `1048576` (1 MiB) | Maximum binary PCM frame accepted by `/stream` |
 | `AIEAR_LOG_JSON` | `false` | Emit structured JSON logs |
 
 ---

@@ -168,8 +168,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         Upload an audio file (WAV, FLAC, OGG, MP3) and receive a full
         multi-modal analysis result.
         """
-        data = await file.read()
-        chunk = _load_audio_bytes(data, settings.audio_sample_rate, source_id=file.filename or "upload")
+        data = await _read_limited_upload(file, settings.api_max_upload_bytes)
+        chunk = _load_audio_bytes(
+            data, settings.audio_sample_rate, source_id=file.filename or "upload"
+        )
         if chunk is None:
             raise HTTPException(status_code=422, detail="Could not decode audio file")
 
@@ -255,6 +257,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         try:
             while True:
                 raw = await websocket.receive_bytes()
+                frame_error = _audio_frame_error(raw, settings.api_max_ws_frame_bytes)
+                if frame_error is not None:
+                    close_code, reason = frame_error
+                    log.warning("Closing WebSocket %s: %s", source_id, reason)
+                    await websocket.close(code=close_code, reason=reason)
+                    return
                 incoming = np.frombuffer(raw, dtype=np.float32)
                 buffer = np.concatenate([buffer, incoming])
 
@@ -276,7 +284,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         finally:
             # Always unregister the per-connection callback to prevent leaks.
             unsubscribe()
-            await websocket.close()
+            with suppress(Exception):
+                await websocket.close()
 
     return app
 
@@ -321,6 +330,28 @@ def _build_analyzers(settings: Settings) -> list:
             )
         )
     return analyzers
+
+
+async def _read_limited_upload(file: UploadFile, max_bytes: int) -> bytes:
+    """Read at most one byte beyond the configured limit before rejecting."""
+    data = await file.read(max_bytes + 1)
+    if len(data) > max_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Audio upload exceeds configured limit of {max_bytes} bytes",
+        )
+    return data
+
+
+def _audio_frame_error(raw: bytes, max_bytes: int) -> tuple[int, str] | None:
+    """Return the WebSocket close code and reason for an invalid PCM frame."""
+    if not raw:
+        return 1003, "Audio frame must not be empty"
+    if len(raw) > max_bytes:
+        return 1009, "Audio frame exceeds configured limit"
+    if len(raw) % np.dtype(np.float32).itemsize:
+        return 1003, "Audio frame must contain complete float32 samples"
+    return None
 
 
 def _load_audio_bytes(
