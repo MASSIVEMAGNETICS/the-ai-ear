@@ -35,6 +35,7 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from ai_ear.api.middleware import RequestBodyLimitMiddleware
 from ai_ear.core.config import Settings
 from ai_ear.core.memory import AuralMemory
 from ai_ear.core.models import AnalysisResult, AudioChunk
@@ -125,6 +126,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ),
         version="0.1.0",
         lifespan=lifespan,
+    )
+
+    # Add the request cap before CORS so CORS headers remain present on 400/413 responses.
+    # CORS is added afterward and therefore wraps this middleware.
+    app.add_middleware(
+        RequestBodyLimitMiddleware,
+        max_body_bytes=(
+            settings.api_max_request_body_bytes
+            if settings.api_max_request_body_bytes is not None
+            else settings.api_max_upload_bytes + 1024 * 1024
+        ),
     )
 
     app.add_middleware(

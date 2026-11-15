@@ -35,6 +35,15 @@ class Settings(BaseSettings):
         le=100 * 1024 * 1024,
         description="Maximum accepted audio upload size in bytes",
     )
+    api_max_request_body_bytes: int | None = Field(
+        default=None,
+        ge=1,
+        le=101 * 1024 * 1024,
+        description=(
+            "Maximum complete POST /analyse request body in bytes; "
+            "defaults to upload limit plus 1 MiB"
+        ),
+    )
     api_max_ws_frame_bytes: int = Field(
         default=1024 * 1024,
         ge=4,

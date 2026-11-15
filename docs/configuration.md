@@ -24,9 +24,10 @@ All settings can be overridden via environment variables prefixed with `AIEAR_`.
 | `AIEAR_API_PORT` | int | `8080` | API server listen port |
 | `AIEAR_API_CORS_ORIGINS` | list[str] | `["*"]` | CORS allowed origins |
 | `AIEAR_API_MAX_UPLOAD_BYTES` | int | `26214400` | Maximum `/analyse` upload payload (25 MiB) |
+| `AIEAR_API_MAX_REQUEST_BODY_BYTES` | int \| null | upload limit + 1 MiB | Maximum complete `/analyse` request body, including multipart overhead; defaults to the upload limit plus 1 MiB |
 | `AIEAR_API_MAX_WS_FRAME_BYTES` | int | `1048576` | Maximum binary PCM `/stream` frame (1 MiB) |
 
-The endpoint reads at most the configured upload limit plus one byte into application memory and returns HTTP 413 when the limit is exceeded. Multipart parsing may spool request data before the endpoint runs, so production ingress should also enforce an HTTP body-size limit. The CLI passes the WebSocket frame limit to Uvicorn; deployments using another ASGI server should configure its message-size limit to match. Oversized frames close with code 1009; frames that are not a whole number of float32 samples close with code 1003.
+The endpoint reads at most the configured upload limit plus one byte into application memory and returns HTTP 413 when the limit is exceeded. An outer ASGI middleware also caps the complete `POST /analyse` body, including multipart boundaries, before Starlette parses or spools it. The middleware rejects an oversized `Content-Length` immediately and counts streamed/chunked request bodies when that header is absent or understated. `AIEAR_API_MAX_REQUEST_BODY_BYTES` overrides the total-body cap; when unset it defaults to the upload limit plus 1 MiB. Keep a matching reverse-proxy/edge body-size limit as defense in depth. The CLI passes the WebSocket frame limit to Uvicorn; deployments using another ASGI server should configure its message-size limit to match. Oversized frames close with code 1009; frames that are not a whole number of float32 samples close with code 1003.
 
 ## Examples
 
