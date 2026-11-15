@@ -268,6 +268,23 @@ class TestRequestBodyLimitMiddleware:
         assert json.loads(body)["detail"] == "Invalid Content-Length header"
         assert app_calls == []
 
+    @pytest.mark.parametrize(
+        "duplicate_values",
+        [(b"8", b"9"), (b"8", b"8")],
+        ids=("conflicting-values", "identical-values"),
+    )
+    def test_duplicate_content_length_headers_are_rejected_before_parser(self, duplicate_values):
+        headers = [
+            (b"content-length", duplicate_values[0]),
+            (b"content-length", duplicate_values[1]),
+        ]
+        status, body, app_calls = _run_request_body_limit(
+            "/analyse", "POST", headers, [], 8
+        )
+        assert status == 400
+        assert json.loads(body)["detail"] == "Invalid Content-Length header"
+        assert app_calls == []
+
 
 class TestBoundedAudioIngress:
     def test_analyse_rejects_upload_over_configured_limit(self):
