@@ -34,6 +34,7 @@ def main(argv: list[str] | None = None) -> int:
             port=args.port,
             reload=args.reload,
             log_level="info",
+            ws_max_size=settings.api_max_ws_frame_bytes,
         )
         return 0
 

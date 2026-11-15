@@ -18,12 +18,16 @@ All settings can be overridden via environment variables prefixed with `AIEAR_`.
 | `AIEAR_ENVIRONMENT_ENABLED` | bool | `true` | Enable environment classification |
 | `AIEAR_ENVIRONMENT_NOISE_GATE_DB` | float | `-50.0` | Frames below this dBFS level are classified as silence |
 | `AIEAR_MEMORY_MAX_RESULTS` | int | `500` | Rolling buffer size for analysis results |
-| `AIEAR_MEMORY_MAX_EVENTS` | int | `200` | Rolling buffer size for aural events |
-| `AIEAR_MEMORY_CONTEXT_WINDOW_S` | float | `120.0` | Default context window for `context_summary()` |
+| `AIEAR_MEMORY_MAX_EVENTS` | int | `1000` | Rolling buffer size for aural events |
+| `AIEAR_MEMORY_CONTEXT_WINDOW_S` | float | `60.0` | Default context window for `context_summary()` |
 | `AIEAR_API_HOST` | string | `"0.0.0.0"` | API server listen host |
 | `AIEAR_API_PORT` | int | `8080` | API server listen port |
-| `AIEAR_API_WORKERS` | int | `1` | Number of uvicorn worker processes |
 | `AIEAR_API_CORS_ORIGINS` | list[str] | `["*"]` | CORS allowed origins |
+| `AIEAR_API_MAX_UPLOAD_BYTES` | int | `26214400` | Maximum `/analyse` upload payload (25 MiB) |
+| `AIEAR_API_MAX_REQUEST_BODY_BYTES` | int \| null | upload limit + 1 MiB | Maximum complete `/analyse` request body, including multipart overhead; defaults to the upload limit plus 1 MiB |
+| `AIEAR_API_MAX_WS_FRAME_BYTES` | int | `1048576` | Maximum binary PCM `/stream` frame (1 MiB) |
+
+The endpoint reads at most the configured upload limit plus one byte into application memory and returns HTTP 413 when the limit is exceeded. An outer ASGI middleware also caps the complete `POST /analyse` body, including multipart boundaries, before Starlette parses or spools it. The middleware rejects an oversized `Content-Length` immediately and counts streamed/chunked request bodies when that header is absent or understated. `AIEAR_API_MAX_REQUEST_BODY_BYTES` overrides the total-body cap; when unset it defaults to the upload limit plus 1 MiB. Keep a matching reverse-proxy/edge body-size limit as defense in depth. The CLI passes the WebSocket frame limit to Uvicorn; deployments using another ASGI server should configure its message-size limit to match. Oversized frames close with code 1009; frames that are not a whole number of float32 samples close with code 1003.
 
 ## Examples
 
